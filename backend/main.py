@@ -11,10 +11,7 @@ import yaml
 app = FastAPI()
 config = yaml.safe_load(open("config.yaml"))
 
-TRUST_STORE_FILES = [
-    f"{config['trust_store_dir']}/google_attestation_root_2016.pem",
-    f"{config['trust_store_dir']}/google_attestation_root_2026.pem"
-]
+TRUST_STORE_FILE = f"{config['trust_store_dir']}/root"
 
 @app.post("/verify")
 async def verify_endpoint(
@@ -63,7 +60,7 @@ async def verify_endpoint(
         raise HTTPException(status_code=400, detail="signature verification failed")
 
     # 3) validate x.509 chain to Google attestation roots
-    ok_chain, msg = validate_chain_against_roots(certs, TRUST_STORE_FILES)
+    ok_chain, msg = validate_chain_against_roots(certs, TRUST_STORE_FILE)
     if not ok_chain:
         raise HTTPException(status_code=400, detail=f"certificate chain validation failed: {msg}")
 

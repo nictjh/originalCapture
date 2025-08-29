@@ -1,9 +1,10 @@
 # utils_x509_attestation.py
 import base64
-import datetime
+import json
 from typing import List, Tuple, Optional
 from cryptography import x509
 from cryptography.hazmat.primitives import serialization, hashes
+from cryptography.hazmat.backends import default_backend
 from cryptography.x509.oid import ExtensionOID, ObjectIdentifier
 from certvalidator import CertificateValidator, ValidationContext
 from pyasn1.type import univ, char, namedtype, tag, constraint
@@ -63,15 +64,19 @@ def load_cert_chain_from_b64_list(x5c_b64_list: List[str]) -> List[x509.Certific
         certs.append(cert)
     return certs
 
-def validate_chain_against_roots(chain: List[x509.Certificate], trust_anchor_paths: List[str], crl_path: Optional[str]=None) -> Tuple[bool, str]:
+def validate_chain_against_roots(chain: List[x509.Certificate], trust_anchor_path: str, crl_path: Optional[str]=None) -> Tuple[bool, str]:
     """
     Use certvalidator to check the chain up to the trust anchors.
     Returns (ok, message)
     """
     trust_roots = []
-    for p in trust_anchor_paths:
-        pem = open(p, "rb").read()
-        trust_roots.append(pem)
+    with open(trust_anchor_path, "r") as f:
+        pem_list = json.load(f)
+
+    for pem_str in pem_list:
+        cert = x509.load_pem_x509_certificate(pem_str.encode(), default_backend())
+        trust_roots.append(cert)
+
     ctx = ValidationContext(trust_roots=trust_roots, crl_fetcher=None)
     # certvalidator wants cryptography.x509 cert objects
     leaf = chain[0]
