@@ -365,7 +365,7 @@ object AttestationPoc {
 
 
     // ---- First Iteration: Working ----
-    /**
+/**
      * Generate a per-capture EC P-256 key with an attestation certificate chain.
      * Correct way to request StrongBox: use a builder, set isStrongBoxBacked(true),
      * try/catch StrongBoxUnavailableException, then rebuild without StrongBox.
