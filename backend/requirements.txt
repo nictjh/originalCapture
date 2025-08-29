@@ -6,3 +6,7 @@ pyasn1-modules
 certvalidator
 requests
 python-multipart
+scikit-learn
+joblib
+numpy
+pydantic
