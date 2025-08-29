@@ -86,15 +86,15 @@ object AttestationPoc {
     //     Result(false, null, null, "POC failed: ${e.message}")
     // }
 
-    // Added another parameter for media file
-    fun run(context: Context, mediaFile: File): Result = runCatching {
+
+    fun run(context: Context): Result = runCatching {
 
         // 1) Create a small fake JPG file to simulate the captured media
-        // val mediaFile = File(context.filesDir, "demo.jpg")
-        // if (!mediaFile.exists()) {
-        //     val randomBytes = Random.Default.nextBytes(2048)
-        //     FileOutputStream(mediaFile).use { it.write(randomBytes) }
-        // }
+        val mediaFile = File(context.filesDir, "demo.jpg")
+        if (!mediaFile.exists()) {
+            val randomBytes = Random.Default.nextBytes(2048)
+            FileOutputStream(mediaFile).use { it.write(randomBytes) }
+        }
 
         // 2) Hash the media file
         val contentHash = sha256File(mediaFile) // Hash the file

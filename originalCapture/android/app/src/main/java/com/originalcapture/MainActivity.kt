@@ -18,8 +18,8 @@ class MainActivity : ReactActivity() {
     // This is required for expo-splash-screen.
     setTheme(R.style.AppTheme);
     super.onCreate(null)
-    // val res = AttestationPoc.run(this)
-    // Log.i("AttestationPoc", "ok=${res.ok} media=${res.mediaPath} sidecar=${res.sidecarPath} msg=${res.message}")
+    val res = AttestationPoc.run(this)
+    Log.i("AttestationPoc", "ok=${res.ok} media=${res.mediaPath} sidecar=${res.sidecarPath} msg=${res.message}")
   }
 
   /**
