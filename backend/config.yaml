@@ -1,0 +1,6 @@
+expected_app_id: "com.originalcapture"
+min_patch_level: 202401  # YYYYMM minimum
+trust_store_dir: "./trust_store"
+crl_url: "https://android.googleapis.com/attestation/revocation"  # example - fetch & cache
+require_hardware_backed: true
+require_verified_boot: true

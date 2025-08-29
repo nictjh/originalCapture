@@ -1,0 +1,7 @@
+fastapi
+uvicorn[standard]
+cryptography
+pyasn1
+pyasn1-modules
+certvalidator
+requests
