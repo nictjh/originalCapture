@@ -1,4 +1,30 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <resources>
-  <color name="splashscreen_background">#FFFFFF</color>
+    <color name="splashscreen_background">#FFFFFF</color>
+    <!-- Existing colors -->
+    <color name="colorPrimary">#22e0da</color>
+    <color name="colorPrimaryVariant">#1bb3ad</color>
+    <color name="colorOnPrimary">#000000</color>
+
+    <!-- Theme colors -->
+    <color name="colorSecondary">#22e0da</color>
+    <color name="colorSecondaryVariant">#1bb3ad</color>
+    <color name="colorOnSecondary">#000000</color>
+
+    <!-- Surface colors -->
+    <color name="colorSurface">#0F0F0F</color>
+    <color name="colorOnSurface">#FFFFFF</color>
+    <color name="colorSurfaceVariant">#1A1A1A</color>
+    <color name="colorOnSurfaceVariant">#CCCCCC</color>
+
+    <!-- Background colors -->
+    <color name="colorBackground">#0F0F0F</color>
+    <color name="colorOnBackground">#FFFFFF</color>
+
+    <!-- Additional colors -->
+    <color name="snackbar_bg">#333333</color>
+    <color name="trim_highlight">#22e0da</color>
+    <color name="trim_overlay">#4022e0da</color>
+
+  <color name="on_primary_container">#FFFFFF</color>
 </resources>

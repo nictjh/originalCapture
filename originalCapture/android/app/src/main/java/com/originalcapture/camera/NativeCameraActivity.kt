@@ -29,6 +29,7 @@ import androidx.core.content.ContextCompat
 import com.google.android.material.tabs.TabLayout
 import com.originalcapture.AttestationPoc
 import com.originalcapture.R
+import com.originalcapture.editor.InstagramStyleCaptionActivity
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -70,6 +71,54 @@ class NativeCameraActivity : ComponentActivity() {
     ActivityResultContracts.RequestPermission()
   ) { granted ->
     if (!granted) Log.w("Camera", "Audio permission denied - video will be silent")
+  }
+
+  // Trim editor launcher
+  private val trimEditorLauncher = registerForActivityResult(
+    ActivityResultContracts.StartActivityForResult()
+  ) { result ->
+    if (result.resultCode == RESULT_OK) {
+      val data = result.data
+      val action = data?.getStringExtra("action")
+      val success = data?.getBooleanExtra("ok", false) ?: false
+
+      when (action) {
+        "trim_saved" -> {
+          if (success) {
+            val originalPath = data.getStringExtra("originalPath")
+            val trimFile = data.getStringExtra("trimFile")
+            val startTimeMs = data.getLongExtra("startTimeMs", 0)
+            val endTimeMs = data.getLongExtra("endTimeMs", 0)
+            val trimmedDurationMs = data.getLongExtra("trimmedDurationMs", 0)
+            val message = data.getStringExtra("message") ?: "Video trimmed"
+
+            // Return trim result to parent
+            val resultIntent = Intent().apply {
+              putExtra("action", "video_trimmed")
+              putExtra("ok", true)
+              putExtra("originalPath", originalPath)
+              putExtra("trimFile", trimFile)
+              putExtra("startTimeMs", startTimeMs)
+              putExtra("endTimeMs", endTimeMs)
+              putExtra("trimmedDurationMs", trimmedDurationMs)
+              putExtra("message", message)
+            }
+            setResult(RESULT_OK, resultIntent)
+            finish()
+          } else {
+            val message = data.getStringExtra("message") ?: "Trim failed"
+            finishWithError(message)
+          }
+        }
+        "error" -> {
+          val message = data.getStringExtra("message") ?: "Trim editor failed"
+          finishWithError(message)
+        }
+      }
+    } else {
+      // User cancelled - return to camera view
+      showCameraUI()
+    }
   }
 
   override fun onCreate(savedInstanceState: Bundle?) {
@@ -261,6 +310,8 @@ class NativeCameraActivity : ComponentActivity() {
     // Show appropriate preview
     if (isVideo) {
       videoPreview.visibility = View.VISIBLE
+      imagePreview.visibility = View.GONE
+
       videoPreview.setVideoURI(Uri.fromFile(file))
       videoPreview.start()
 
@@ -268,9 +319,18 @@ class NativeCameraActivity : ComponentActivity() {
       videoPreview.setOnCompletionListener {
         videoPreview.start()
       }
+
+      // Enable edit button for videos only
+      editBtn.isEnabled = true
+      editBtn.alpha = 1.0f
     } else {
       imagePreview.visibility = View.VISIBLE
+      videoPreview.visibility = View.GONE
       imagePreview.setImageURI(Uri.fromFile(file))
+
+      // Disable edit for photos in this simple version
+      editBtn.isEnabled = false
+      editBtn.alpha = 0.5f
     }
 
     // Show action buttons
@@ -288,6 +348,11 @@ class NativeCameraActivity : ComponentActivity() {
     captureBtn.visibility = View.VISIBLE
     modeTabLayout.visibility = View.VISIBLE
     versionText.visibility = View.VISIBLE
+
+    // Stop video preview if playing
+    if (videoPreview.isPlaying) {
+      videoPreview.stopPlayback()
+    }
   }
 
   private fun onSave() {
@@ -302,6 +367,7 @@ class NativeCameraActivity : ComponentActivity() {
         putExtra("action", "save")
         putExtra("ok", true)
         putExtra("mediaPath", file.absolutePath)
+        putExtra("mediaType", "video")
         putExtra("message", "Video saved successfully")
       }
       setResult(RESULT_OK, data)
@@ -314,6 +380,7 @@ class NativeCameraActivity : ComponentActivity() {
         putExtra("ok", res.ok)
         putExtra("mediaPath", res.mediaPath)
         putExtra("receiptPath", res.sidecarPath)
+        putExtra("mediaType", "image")
         putExtra("message", res.message)
       }
       setResult(RESULT_OK, data)
@@ -327,15 +394,16 @@ class NativeCameraActivity : ComponentActivity() {
       return
     }
 
-    // For images, return path for image editing
-    val data = Intent().apply {
-      putExtra("action", "edit")
-      putExtra("ok", true)
-      putExtra("mediaPath", file.absolutePath)
-      putExtra("message", "Image editing")
+    // Only launch trim editor for videos
+    if (file.extension.lowercase() == "mp4") {
+      val intent = Intent(this, SimpleTrimEditorActivity::class.java).apply {
+        putExtra(SimpleTrimEditorActivity.EXTRA_VIDEO_PATH, file.absolutePath)
+      }
+      trimEditorLauncher.launch(intent)
+    } else {
+      // Photos not supported in this simple version
+      finishWithError("Photo editing not supported in this version")
     }
-    setResult(RESULT_OK, data)
-    finish()
   }
 
   private fun onRetake() {

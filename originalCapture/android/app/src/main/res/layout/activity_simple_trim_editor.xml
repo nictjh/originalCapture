@@ -1,0 +1,336 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#0F0F0F">
+
+    <!-- Header -->
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/headerLayout"
+        android:layout_width="0dp"
+        android:layout_height="56dp"
+        android:background="#1A1A1A"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <!-- Close button -->
+        <ImageButton
+            android:id="@+id/closeBtn"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:src="@drawable/ic_close"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:tint="@android:color/white"
+            android:contentDescription="Close"
+            android:layout_marginStart="4dp"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent"/>
+
+        <!-- Title -->
+        <TextView
+            android:id="@+id/titleText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="trim"
+            android:textColor="@android:color/white"
+            android:textSize="18sp"
+            android:fontFamily="@font/doto_regular"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent"/>
+
+        <!-- Export button -->
+        <TextView
+            android:id="@+id/exportBtn"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Export"
+            android:textColor="#22e0da"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:padding="8dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:layout_marginEnd="8dp"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent"/>
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+    <!-- Timeline container - NOW ABOVE THE VIDEO PREVIEW -->
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/timelineContainer"
+        android:layout_width="0dp"
+        android:layout_height="140dp"
+        android:background="#1A1A1A"
+        android:padding="16dp"
+        app:layout_constraintTop_toBottomOf="@+id/headerLayout"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <!-- Timeline track -->
+        <View
+            android:id="@+id/timelineTrack"
+            android:layout_width="0dp"
+            android:layout_height="60dp"
+            android:layout_marginStart="32dp"
+            android:layout_marginEnd="32dp"
+            android:background="#333333"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"/>
+
+        <!-- Thumbnail strip (will be populated programmatically) -->
+        <HorizontalScrollView
+            android:id="@+id/thumbnailScrollView"
+            android:layout_width="0dp"
+            android:layout_height="60dp"
+            android:layout_marginStart="32dp"
+            android:layout_marginEnd="32dp"
+            android:scrollbars="none"
+            android:clickable="false"
+            android:focusable="false"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent">
+
+            <LinearLayout
+                android:id="@+id/thumbnailContainer"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:orientation="horizontal"
+                android:clickable="false"
+                android:focusable="false"/>
+        </HorizontalScrollView>
+
+        <!-- Trim overlay (selected region) -->
+        <View
+            android:id="@+id/trimOverlay"
+            android:layout_width="0dp"
+            android:layout_height="60dp"
+            android:layout_marginStart="32dp"
+            android:layout_marginEnd="32dp"
+            android:background="#4022e0da"
+            android:clickable="false"
+            android:focusable="false"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"/>
+
+        <!-- Left trim handle with grip above -->
+        <androidx.constraintlayout.widget.ConstraintLayout
+            android:id="@+id/leftTrimHandleContainer"
+            android:layout_width="20dp"
+            android:layout_height="80dp"
+            android:layout_marginStart="32dp"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintStart_toStartOf="parent">
+
+            <!-- Top grip indicator ABOVE timeline -->
+            <View
+                android:layout_width="16dp"
+                android:layout_height="10dp"
+                android:background="#22e0da"
+                app:layout_constraintTop_toTopOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"/>
+
+            <!-- Main handle that sits ON the timeline -->
+            <View
+                android:id="@+id/leftTrimHandle"
+                android:layout_width="8dp"
+                android:layout_height="60dp"
+                android:layout_marginTop="10dp"
+                android:background="#22e0da"
+                app:layout_constraintTop_toTopOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"/>
+
+            <!-- Handle grip lines -->
+            <View
+                android:layout_width="2dp"
+                android:layout_height="20dp"
+                android:layout_marginTop="30dp"
+                android:background="@android:color/white"
+                app:layout_constraintTop_toTopOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"/>
+        </androidx.constraintlayout.widget.ConstraintLayout>
+
+        <!-- Right trim handle with grip above -->
+        <androidx.constraintlayout.widget.ConstraintLayout
+            android:id="@+id/rightTrimHandleContainer"
+            android:layout_width="20dp"
+            android:layout_height="80dp"
+            android:layout_marginEnd="32dp"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintEnd_toEndOf="parent">
+
+            <!-- Top grip indicator ABOVE timeline -->
+            <View
+                android:layout_width="16dp"
+                android:layout_height="10dp"
+                android:background="#22e0da"
+                app:layout_constraintTop_toTopOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"/>
+
+            <!-- Main handle that sits ON the timeline -->
+            <View
+                android:id="@+id/rightTrimHandle"
+                android:layout_width="8dp"
+                android:layout_height="60dp"
+                android:layout_marginTop="10dp"
+                android:background="#22e0da"
+                app:layout_constraintTop_toTopOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"/>
+
+            <!-- Handle grip lines -->
+            <View
+                android:layout_width="2dp"
+                android:layout_height="20dp"
+                android:layout_marginTop="30dp"
+                android:background="@android:color/white"
+                app:layout_constraintTop_toTopOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"/>
+        </androidx.constraintlayout.widget.ConstraintLayout>
+
+        <!-- Current position indicator -->
+        <View
+            android:id="@+id/positionIndicator"
+            android:layout_width="2dp"
+            android:layout_height="70dp"
+            android:layout_marginStart="32dp"
+            android:background="@android:color/white"
+            android:clickable="false"
+            android:focusable="false"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintStart_toStartOf="parent"/>
+
+        <!-- Invisible touch overlay for timeline seeking -->
+        <View
+            android:id="@+id/timelineTouchArea"
+            android:layout_width="0dp"
+            android:layout_height="60dp"
+            android:layout_marginStart="32dp"
+            android:layout_marginEnd="32dp"
+            android:background="@android:color/transparent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"/>
+
+        <!-- Timeline info -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="8dp"
+            app:layout_constraintTop_toBottomOf="@+id/timelineTrack"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent">
+
+            <TextView
+                android:id="@+id/trimStartTimeText"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="00:00"
+                android:textColor="#22e0da"
+                android:textSize="12sp"
+                android:textAlignment="textStart"/>
+
+            <TextView
+                android:id="@+id/trimDurationText"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Duration: 00:00"
+                android:textColor="@android:color/white"
+                android:textSize="12sp"
+                android:textAlignment="center"/>
+
+            <TextView
+                android:id="@+id/trimEndTimeText"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="00:00"
+                android:textColor="#22e0da"
+                android:textSize="12sp"
+                android:textAlignment="textEnd"/>
+        </LinearLayout>
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+    <!-- Video preview area - NOW BELOW THE TIMELINE -->
+    <FrameLayout
+        android:id="@+id/videoContainer"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:background="#000000"
+        app:layout_constraintTop_toBottomOf="@+id/timelineContainer"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <VideoView
+            android:id="@+id/videoView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_gravity="center"/>
+
+        <!-- Play/pause overlay -->
+        <ImageButton
+            android:id="@+id/playPauseBtn"
+            android:layout_width="72dp"
+            android:layout_height="72dp"
+            android:layout_gravity="center"
+            android:src="@drawable/ic_play_circle"
+            android:background="@android:color/transparent"
+            android:tint="@android:color/white"
+            android:alpha="0.8"/>
+
+        <!-- Time display -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom|center"
+            android:layout_marginBottom="16dp"
+            android:background="#80000000"
+            android:paddingHorizontal="12dp"
+            android:paddingVertical="6dp"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/currentTimeText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="00:00"
+                android:textColor="@android:color/white"
+                android:textSize="14sp"
+                android:fontFamily="monospace"/>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text=" / "
+                android:textColor="#CCCCCC"
+                android:textSize="14sp"/>
+
+            <TextView
+                android:id="@+id/totalTimeText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="00:00"
+                android:textColor="#CCCCCC"
+                android:textSize="14sp"
+                android:fontFamily="monospace"/>
+        </LinearLayout>
+    </FrameLayout>
+
+</androidx.constraintlayout.widget.ConstraintLayout>
