@@ -1,4 +1,4 @@
-package com.originalcapture.provenance.manager
+package com.originalcapture.provenance
 
 import com.originalcapture.provenance.model.*
 import com.google.gson.Gson

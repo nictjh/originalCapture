@@ -317,12 +317,12 @@ data class TextOverlayOperation(
     constructor(text: String, x: Int, y: Int, fontSize: Int, color: String, fontFamily: String? = null) : this(
         type = "overlay",
         timestamp = Instant.now(),
-        parameters = mapOf(
+        parameters = mapOf<String, Any>(
             "text" to text,
             "position" to listOf(x, y),
             "font_size" to fontSize,
             "color" to color,
-            "font_family" to fontFamily
+            "font_family" to fontFamily as Any
         ),
         text = text,
         x = x,
