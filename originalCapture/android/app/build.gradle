@@ -155,6 +155,7 @@ dependencies {
     implementation "androidx.camera:camera-lifecycle:$camerax_version"
     implementation "androidx.camera:camera-view:$camerax_version"
     implementation "androidx.camera:camera-video:$camerax_version"
+    implementation 'com.google.guava:guava:31.1-android'
 
     implementation "androidx.constraintlayout:constraintlayout:2.2.0"
 
