@@ -71,6 +71,7 @@ class CameraAttestModule(private val reactCtx: ReactApplicationContext)
       putString("mediaPath", data?.getStringExtra("mediaPath"))
       putString("receiptPath", data?.getStringExtra("receiptPath"))
       putString("message", data?.getStringExtra("message"))
+      putString("serverResponseBody", data?.getStringExtra("serverResponseBody"))
     }
     promise.resolve(map)
   }

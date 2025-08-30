@@ -5,6 +5,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { InteractionManager } from 'react-native';
 import { openCamera } from './native/CameraAttest';
 import EditorScreen from './EditorScreen';
+import SuccessScreen from './SuccessScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -16,6 +17,24 @@ function HomeScreen({ navigation }) {
     try {
       const res = await openCamera();
       setResult(res);
+
+       if (res?.serverResponseBody) {
+        try {
+            const serverJson = JSON.parse(res.serverResponseBody);
+
+            if (
+            serverJson.ok === true &&
+            serverJson.message === "verified" &&
+            serverJson.attestation?.attestationSecurityLevel === 1
+            ) {
+            // ✅ Strict success case
+            navigation.navigate("SuccessScreen", { details: serverJson });
+            return;
+            }
+        } catch (e) {
+            console.warn("Failed to parse serverResponseBody", e);
+        }
+        }
 
       //Navigate Button use the result bro, please reference my returns for picture
       if (res?.action === 'edit' && res?.mediaPath) {
@@ -70,6 +89,7 @@ export default function App() {
       <Stack.Navigator>
         <Stack.Screen name="Home" component={HomeScreen} options={{ title: 'Camera Attest' }} />
         <Stack.Screen name="Editor" component={EditorScreen} options={{ title: 'Edit Photo' }} />
+        <Stack.Screen name="SuccessScreen" component={SuccessScreen} options={{ title: 'Success' }} />
       </Stack.Navigator>
     </NavigationContainer>
   );
