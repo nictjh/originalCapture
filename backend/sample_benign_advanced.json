@@ -1,0 +1,40 @@
+{
+  "asset_id": "benign-img-2519",
+  "created_at": "2025-08-29T09:12:33Z",
+  "meta": {
+    "width": 1920,
+    "height": 1080
+  },
+  "provenance": {
+    "c2pa_present": true,
+    "signed": true,
+    "actions_count": 3
+  },
+  "ops": [
+    {
+      "t": "transform",
+      "p": {
+        "rotate": 90
+      }
+    },
+    {
+      "t": "privacy_blur",
+      "p": {
+        "method": "gaussian",
+        "area_pct": 6.784258780805862
+      }
+    },
+    {
+      "t": "adjust",
+      "p": {
+        "brightness": -7,
+        "contrast": 15,
+        "saturation": 9
+      }
+    }
+  ],
+  "export": {
+    "fmt": "jpg",
+    "quality": 90
+  }
+}
