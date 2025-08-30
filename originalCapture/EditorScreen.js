@@ -4,10 +4,13 @@ import {
   View, Text, Image, Button, StyleSheet, ActivityIndicator,
   TouchableOpacity, Alert, Platform, Dimensions, Animated
 } from 'react-native';
-import { cropAndOverwriteOriginalExternalFiles } from './cropHelpers'; // <— use the strict helper
+import { cropAndOverwriteOriginalExternalFiles } from './cropHelpers';
+import { NativeModules } from 'react-native';
+const { AttestationBridge } = NativeModules;
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 const PADDING = 16;
+const BASE_URL = 'http://192.168.253.197:8000'; // your FastAPI server
 
 export default function EditorScreen({ route, navigation }) {
   const { mediaPath, returnTo } = route?.params ?? {};
@@ -55,15 +58,36 @@ export default function EditorScreen({ route, navigation }) {
   const onCompose = () => Alert.alert('Compose (placeholder)', 'Hook this up to draw/markup flow.');
   const onRedact  = () => Alert.alert('Redact (placeholder)', 'Hook this to adjustments, etc.');
 
-  const onSave = () => {
-    // const raw = mediaPath?.startsWith('file://') ? mediaPath.slice(7) : mediaPath;
-    // if (!raw) return Alert.alert('Nothing to save');
-    // if (returnTo) {
-    //   navigation.navigate({ name: returnTo, params: { editedPath: raw }, merge: true });
-    // } else {
-    //   navigation.goBack();
-    // }
-    console.log('[EDITOR] onSave pressed - implement saving logic here');
+ const onSave = async () => {
+    try {
+      if (!mediaPath) {
+        return Alert.alert('Nothing to save', 'Missing mediaPath');
+      }
+
+      const res = await AttestationBridge.saveFromEditor(
+        mediaPath,
+        BASE_URL
+      );
+      // res: { ok, mediaPath, receiptPath, message, serverCode, serverBody }
+      let verified = false;
+      try {
+        const body = JSON.parse(res.serverBody);
+        verified =
+          body?.ok === true &&
+          body?.message === 'verified' &&
+          body?.attestation?.attestationSecurityLevel === 1;
+      } catch (e) {
+        // keep verified = false
+      }
+
+      if (verified) {
+        navigation.navigate('SuccessScreen', { details: JSON.parse(res.serverBody) });
+      } else {
+        Alert.alert('Verification failed', res.serverBody || `HTTP ${res.serverCode}`);
+      }
+    } catch (e) {
+      Alert.alert('Error', String(e?.message || e));
+    }
   };
 
   const onDiscard = () =>
