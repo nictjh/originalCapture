@@ -29,7 +29,7 @@ import androidx.core.content.ContextCompat
 import com.google.android.material.tabs.TabLayout
 import com.originalcapture.AttestationPoc
 import com.originalcapture.R
-import com.originalcapture.editor.InstagramStyleCaptionActivity
+import com.originalcapture.editor.SimpleTrimEditorActivity
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Locale
