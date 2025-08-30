@@ -296,7 +296,7 @@ class NativeCameraActivity : ComponentActivity() {
         val res = AttestationPoc.run(this, file)
 
         lifecycleScope.launch {
-            val baseUrl = "http://xxxxx:8000" // Change this to localHOST ya,  ifconfig | grep inet and ensure both laptop and device are on same network
+            val baseUrl = "http://192.168.253.197:8000" // Change this to localHOST ya,  ifconfig | grep inet and ensure both laptop and device are on same network
 
             val mediaPath = res.mediaPath ?: run {
                 Log.e("AttestationPoc", "mediaPath is null")
