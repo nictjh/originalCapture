@@ -11,6 +11,10 @@
   <uses-permission android:name="android.permission.CAMERA"/>
   <!-- Needed only if you record audio with video -->
   <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+  <!-- Precise location for EXIF GPS -->
+  <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+  <!-- (Optional) Coarse if you want a fallback -->
+  <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
   <!-- END OPTIONAL PERMISSIONS -->
 
   <queries>

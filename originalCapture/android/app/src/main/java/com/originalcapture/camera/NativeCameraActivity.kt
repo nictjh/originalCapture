@@ -5,6 +5,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
+import android.os.Looper
 import android.util.Log
 import android.view.View
 import android.widget.Button
@@ -24,8 +25,18 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Locale
 
+import android.location.Location
+import android.location.LocationListener
+import android.location.LocationManager
+import com.google.android.gms.location.FusedLocationProviderClient
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
+import com.google.android.gms.tasks.CancellationTokenSource
+
+
 class NativeCameraActivity : ComponentActivity() {
 
+  private lateinit var fused: FusedLocationProviderClient
   private lateinit var previewView: PreviewView
   private lateinit var captureBtn: Button
 
@@ -43,10 +54,14 @@ class NativeCameraActivity : ComponentActivity() {
     if (granted) startCamera() else finishWithError("CAMERA permission denied")
   }
 
+  private val requestLocation = registerForActivityResult(
+    ActivityResultContracts.RequestPermission()
+  ) { /* do nothing here; */ }
+
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
     setContentView(R.layout.activity_native_camera)
-
+    fused = LocationServices.getFusedLocationProviderClient(this)
     previewView = findViewById(R.id.previewView)
     captureBtn = findViewById(R.id.captureBtn)
 
@@ -64,9 +79,20 @@ class NativeCameraActivity : ComponentActivity() {
   }
 
   private fun ensurePermissionAndStart() {
-    val ok = ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) ==
+    val camOk = ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) ==
       PackageManager.PERMISSION_GRANTED
-    if (ok) startCamera() else requestCamera.launch(Manifest.permission.CAMERA)
+    if (!camOk) {
+      requestCamera.launch(Manifest.permission.CAMERA)
+      return
+    }
+    //Location is optional, so dont block if not granted
+    val locOk = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) ==
+      PackageManager.PERMISSION_GRANTED
+    if (!locOk) {
+      requestLocation.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+    }
+
+    startCamera()
   }
 
   private fun startCamera() {
@@ -94,6 +120,55 @@ class NativeCameraActivity : ComponentActivity() {
     }, ContextCompat.getMainExecutor(this))
   }
 
+  // Working
+//   private fun takePhoto() {
+//     val ic = imageCapture ?: return
+
+//     // Delete previous capture if any
+//     deleteLastCapture()
+
+//     val name = "IMG_" + SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US)
+//       .format(System.currentTimeMillis()) + ".jpg"
+//     val file = File(filesDir, name)
+
+//     // capture immediately (no waiting for location)
+//     val opts = ImageCapture.OutputFileOptions.Builder(file).build()
+
+//     ic.takePicture(
+//         opts,
+//         ContextCompat.getMainExecutor(this),
+//         object : ImageCapture.OnImageSavedCallback {
+//             override fun onError(exc: ImageCaptureException) {
+//                 finishWithError("Capture failed: ${exc.message}")
+//             }
+//             override fun onImageSaved(output: ImageCapture.OutputFileResults) {
+//                 lastCapturedFile = file
+//                 showPreviewUI(file)
+//                 // Now try to get location and write to EXIF if we got one
+//                 fetchOneShotLocation { loc ->
+//                     Log.i("AttestationPoc", "~~~~~~~~~~~~ loc=${loc?.latitude}, ${loc?.longitude}")
+//                     try {
+//                         if (loc != null) {
+//                             val exif = androidx.exifinterface.media.ExifInterface(file.absolutePath)
+//                             exif.setLatLong(loc.latitude, loc.longitude)
+//                             exif.setAttribute(
+//                                 androidx.exifinterface.media.ExifInterface.TAG_GPS_TIMESTAMP,
+//                                 (System.currentTimeMillis() / 1000L).toString()
+//                             )
+//                             exif.saveAttributes()
+//                             Log.i("AttestationPoc", "~~~~~~~~~~~ Wrote GPS EXIF")
+//                             // com.originalcapture.AttestationPoc.logExifTags("AttestationPocPROOOOOF", file)
+//                         }
+//                     } catch (e: Exception) {
+//                         Log.w("AttestationPoc", "~~~~~~~~~~~ Failed to write GPS EXIF: ${e.message}")
+//                     }
+//                 }
+//             }
+//         }
+//     )
+//     }
+
+
   private fun takePhoto() {
     val ic = imageCapture ?: return
 
@@ -104,21 +179,81 @@ class NativeCameraActivity : ComponentActivity() {
       .format(System.currentTimeMillis()) + ".jpg"
     val file = File(filesDir, name)
 
+    // capture immediately (no waiting for location)
     val opts = ImageCapture.OutputFileOptions.Builder(file).build()
+
     ic.takePicture(
-      opts,
-      ContextCompat.getMainExecutor(this),
-      object : ImageCapture.OnImageSavedCallback {
-        override fun onError(exc: ImageCaptureException) {
-          finishWithError("Capture failed: ${exc.message}")
+        opts,
+        ContextCompat.getMainExecutor(this),
+        object : ImageCapture.OnImageSavedCallback {
+            override fun onError(exc: ImageCaptureException) {
+                finishWithError("Capture failed: ${exc.message}")
+            }
+            override fun onImageSaved(output: ImageCapture.OutputFileResults) {
+                lastCapturedFile = file
+                showPreviewUI(file)
+
+                // Fetch location and write EXIF GPS (then verify immediately)
+                fetchOneShotLocation { loc ->
+                    Log.i("AttestationPoc", "loc=${loc?.latitude}, ${loc?.longitude}")
+
+                    if (loc == null) {
+                        Log.w("AttestationPoc", "No location; skipping EXIF GPS")
+                        return@fetchOneShotLocation
+                    }
+
+                    try {
+                        // --- Write GPS EXIF (UTC formats required by EXIF) ---
+                        val exif = androidx.exifinterface.media.ExifInterface(file.absolutePath)
+                        exif.setLatLong(loc.latitude, loc.longitude)
+
+                        val tz = java.util.TimeZone.getTimeZone("UTC")
+                        val cal = java.util.Calendar.getInstance(tz).apply { timeInMillis = System.currentTimeMillis() }
+                        val yyyy = cal.get(java.util.Calendar.YEAR)
+                        val mm   = cal.get(java.util.Calendar.MONTH) + 1
+                        val dd   = cal.get(java.util.Calendar.DAY_OF_MONTH)
+                        val hh   = cal.get(java.util.Calendar.HOUR_OF_DAY)
+                        val mi   = cal.get(java.util.Calendar.MINUTE)
+                        val ss   = cal.get(java.util.Calendar.SECOND)
+
+                        val dateStamp = String.format(java.util.Locale.US, "%04d:%02d:%02d", yyyy, mm, dd)
+                        val timeStamp = String.format(java.util.Locale.US, "%d/1,%d/1,%d/1", hh, mi, ss)
+
+                        exif.setAttribute(androidx.exifinterface.media.ExifInterface.TAG_GPS_DATESTAMP, dateStamp)
+                        exif.setAttribute(androidx.exifinterface.media.ExifInterface.TAG_GPS_TIMESTAMP, timeStamp)
+                        exif.setAttribute(androidx.exifinterface.media.ExifInterface.TAG_SOFTWARE, "OriginalCapture")
+                        exif.saveAttributes()
+                        Log.i("AttestationPoc", "Wrote GPS EXIF")
+
+                        // --- Verify immediately (reopen fresh instance) ---
+                        val verify = androidx.exifinterface.media.ExifInterface(file.absolutePath)
+                        val latLong = FloatArray(2)
+                        val hasLatLong = verify.getLatLong(latLong)
+                        Log.i(
+                            "AttestationPoc",
+                            "Verify EXIF: hasLatLong=$hasLatLong lat=${if (hasLatLong) latLong[0] else "NA"} lon=${if (hasLatLong) latLong[1] else "NA"} " +
+                            "gpsDate=${verify.getAttribute(androidx.exifinterface.media.ExifInterface.TAG_GPS_DATESTAMP)} " +
+                            "gpsTime=${verify.getAttribute(androidx.exifinterface.media.ExifInterface.TAG_GPS_TIMESTAMP)}"
+                        )
+
+                        // Optional: structured dump
+                        com.originalcapture.AttestationPoc.logExifTagsHard("AttestationPoc", file)
+                        com.originalcapture.AttestationPoc.logExifProof("AttestationPoc", file)
+
+                        // If you want to continue to attestation here (instead of on Save):
+                        // val res = com.originalcapture.AttestationPoc.run(this@YourActivity, file)
+                        // Log.i("AttestationPoc", "Attestation result: $res")
+
+                    } catch (e: Exception) {
+                        Log.w("AttestationPoc", "Failed to write/verify GPS EXIF: ${e.message}")
+                    }
+                }
+            }
         }
-        override fun onImageSaved(output: ImageCapture.OutputFileResults) {
-          lastCapturedFile = file
-          showPreviewUI(file)
-        }
-      }
     )
-  }
+    }
+
+
 
   /** Switch UI from live camera to post-capture choices */
   private fun showPreviewUI(file: File) {
@@ -221,4 +356,146 @@ class NativeCameraActivity : ComponentActivity() {
     setResult(RESULT_OK, data)
     finish()
   }
+
+  private fun hasGms(): Boolean = try {
+        // Class exists because you added the dep; check runtime availability:
+        val availability = com.google.android.gms.common.GoogleApiAvailability.getInstance()
+            .isGooglePlayServicesAvailable(this)
+        availability == com.google.android.gms.common.ConnectionResult.SUCCESS
+    } catch (_: Throwable) {
+        false
+    }
+
+    private fun fetchWithLocationManager(onResult: (Location?) -> Unit) {
+        val lm = getSystemService(LOCATION_SERVICE) as LocationManager
+        val fineGranted = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        val coarseGranted = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        if (!fineGranted && !coarseGranted) { onResult(null); return }
+
+        // Try cached first (fast, may be null)
+        val cached = sequenceOf(
+            LocationManager.GPS_PROVIDER,
+            LocationManager.NETWORK_PROVIDER,
+            LocationManager.PASSIVE_PROVIDER
+        ).mapNotNull { prov ->
+            runCatching { lm.getLastKnownLocation(prov) }.getOrNull()
+        }.maxByOrNull { it.time ?: 0L }
+
+        if (cached != null) {
+            onResult(cached); return
+        }
+
+        // Request a single quick update from the best available provider
+        val provider = when {
+            fineGranted && lm.isProviderEnabled(LocationManager.GPS_PROVIDER) -> LocationManager.GPS_PROVIDER
+            lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER) -> LocationManager.NETWORK_PROVIDER
+            else -> null
+        }
+        if (provider == null) { onResult(null); return }
+
+        var finished = false
+        fun finish(loc: Location?) {
+            if (!finished) {
+                finished = true
+                onResult(loc)
+            }
+        }
+
+        val listener = object : LocationListener {
+            override fun onLocationChanged(loc: Location) {
+                lm.removeUpdates(this)
+                finish(loc)
+            }
+            @Deprecated("unused") override fun onStatusChanged(p: String?, s: Int, b: Bundle?) {}
+            override fun onProviderEnabled(p: String) {}
+            override fun onProviderDisabled(p: String) {}
+        }
+
+        try {
+            val perm = if (fineGranted) Manifest.permission.ACCESS_FINE_LOCATION else Manifest.permission.ACCESS_COARSE_LOCATION
+            if (ContextCompat.checkSelfPermission(this, perm) != PackageManager.PERMISSION_GRANTED) {
+                finish(null); return
+            }
+            lm.requestLocationUpdates(provider, 0L, 0f, listener, Looper.getMainLooper())
+            // Hard timeout so we always return
+            previewView.postDelayed({
+                lm.removeUpdates(listener)
+                finish(null)
+            }, 8000)
+        } catch (e: Exception) {
+            Log.w("AttestationPoc", "LM fallback failed: ${e.message}")
+            finish(null)
+        }
+    }
+
+    // private fun fetchOneShotLocation(onResult: (Location?) -> Unit) {
+    //     val ok = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) ==
+    //             PackageManager.PERMISSION_GRANTED
+    //     if (!ok) { onResult(null); return }
+
+    //     var done = false
+    //     fun finish(loc: Location?) { if (!done) { done = true; onResult(loc) } }
+
+    //     val timeoutMs = 8000L
+    //     // hard timeout → ALWAYS finish
+    //     previewView.postDelayed({ finish(null) }, timeoutMs)
+
+    //     // try last known first (usually instant)
+    //     fused.lastLocation
+    //         .addOnSuccessListener { last ->
+    //             if (last != null) {
+    //                 finish(last)
+    //             } else {
+    //                 val cts = CancellationTokenSource()
+    //                 fused.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, cts.token)
+    //                     .addOnSuccessListener { cur -> finish(cur) }
+    //                     .addOnFailureListener { finish(null) }
+    //                 // cancel near the timeout; final finish is the posted timeout above
+    //                 previewView.postDelayed({ cts.cancel() }, timeoutMs - 500)
+    //             }
+    //         }
+    //         .addOnFailureListener { finish(null) }
+    // }
+
+    private fun fetchOneShotLocation(onResult: (Location?) -> Unit) {
+        val fine = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        val coarse = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        if (!fine && !coarse) { onResult(null); return }
+
+        if (hasGms()) {
+            Log.i("AttestationPoc", "GMS available, using FusedLocationProviderClient")
+            // Try Play services first, with guaranteed callback + LM fallback
+            var done = false
+            fun finish(loc: Location?) { if (!done) { done = true; onResult(loc) } }
+
+            val priority = if (fine)
+                com.google.android.gms.location.Priority.PRIORITY_HIGH_ACCURACY
+            else
+                com.google.android.gms.location.Priority.PRIORITY_BALANCED_POWER_ACCURACY
+
+            val timeoutMs = 8000L
+            previewView.postDelayed({ finish(null) }, timeoutMs)
+
+            // lastLocation (fast) then getCurrentLocation
+            fused.lastLocation
+                .addOnSuccessListener { last ->
+                    if (last != null) {
+                        finish(last)
+                    } else {
+                        val cts = CancellationTokenSource()
+                        fused.getCurrentLocation(priority, cts.token)
+                            .addOnSuccessListener { cur ->
+                                if (cur != null) finish(cur) else fetchWithLocationManager(::finish)
+                            }
+                            .addOnFailureListener { fetchWithLocationManager(::finish) }
+                        previewView.postDelayed({ cts.cancel() }, timeoutMs - 1000)
+                    }
+                }
+                .addOnFailureListener { fetchWithLocationManager(::finish) }
+        } else {
+            // No Play services on the device → pure AOSP
+            fetchWithLocationManager(onResult)
+        }
+    }
+
 }

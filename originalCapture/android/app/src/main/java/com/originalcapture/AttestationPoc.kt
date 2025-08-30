@@ -24,6 +24,12 @@ import org.bouncycastle.asn1.ASN1OctetString
 import org.bouncycastle.asn1.ASN1Primitive
 import org.bouncycastle.asn1.ASN1Sequence
 
+// for exif, Images
+import androidx.exifinterface.media.ExifInterface
+// For Videos
+import android.media.MediaMetadataRetriever
+
+
 
 // Valid real Android device produced and signed this exact file, with verified boot and app binding.
 object AttestationPoc {
@@ -89,15 +95,25 @@ object AttestationPoc {
     // Added another parameter for media file
     fun run(context: Context, mediaFile: File): Result = runCatching {
 
-        // 1) Create a small fake JPG file to simulate the captured media
-        // val mediaFile = File(context.filesDir, "demo.jpg")
-        // if (!mediaFile.exists()) {
-        //     val randomBytes = Random.Default.nextBytes(2048)
-        //     FileOutputStream(mediaFile).use { it.write(randomBytes) }
-        // }
+        val cleaned = File(mediaFile.parentFile ?: context.filesDir,
+        mediaFile.nameWithoutExtension + "_clean.jpg")
 
-        // 2) Hash the media file
-        val contentHash = sha256File(mediaFile) // Hash the file
+        logExifProof("AttestationPocBefore", mediaFile)
+        try {
+            stripImageMetadataJpeg(mediaFile, cleaned)
+            // swap to cleaned; remove original
+            if (mediaFile.exists()) mediaFile.delete()
+            logExifProof("AttestationPocAfter", cleaned)
+        } catch (e: Exception) {
+            Log.w(TAG, "Image metadata strip failed, using original: ${e.message}")
+            // fall back to original if strip fails
+            cleaned.delete()
+            // keep mediaFile as-is
+        }
+        val fileForProof = if (cleaned.exists()) cleaned else mediaFile
+
+        // --- 1) Hash the (cleaned) file ---
+        val contentHash = sha256File(fileForProof)
         val contentHashB64 = b64(contentHash) // Base64 encode the hash
 
         // 3) Build Canonical, minified payload string
@@ -116,14 +132,17 @@ object AttestationPoc {
         val signatureB64 = signPayload(alias, payloadCanonical)
 
         // 6) Emit sidecar receipt JSON (include chain if present; empty list otherwise)
-        val sidecar = File(context.filesDir, mediaFile.name + ".sig.json")
+        val sidecar = File(
+            fileForProof.parentFile ?: context.filesDir,
+            fileForProof.name + ".sig.json"
+        )
         val chain = attRes.chain ?: emptyList()
         writeReceipt(sidecar, payloadCanonical, signatureB64, chain)
 
         // 7) Delete key for unlinkability (no reuse)
         deleteKey(alias)
 
-        Log.i(TAG, "Media: ${mediaFile.absolutePath}")
+        Log.i(TAG, "Media: ${fileForProof.absolutePath}")
         Log.i(TAG, "Receipt: ${sidecar.absolutePath}")
         Log.i(TAG, "Attestation summary: ${attRes.message}")
 
@@ -138,7 +157,7 @@ object AttestationPoc {
 
         Result(
             ok = true,
-            mediaPath = mediaFile.absolutePath,
+            mediaPath = fileForProof.absolutePath,
             sidecarPath = sidecar.absolutePath,
             message = "POC complete. $note. insideSecureHardware=${attRes.insideSecureHardware}"
         )
@@ -449,6 +468,54 @@ object AttestationPoc {
     }
 
 
+    // Stripping of metadata functions
+    fun stripImageMetadataJpeg(input: File, output: File) {
+        val bmp = android.graphics.BitmapFactory.decodeFile(input.absolutePath)
+            ?: throw IllegalStateException("decode failed")
+        output.outputStream().use { out ->
+            bmp.compress(android.graphics.Bitmap.CompressFormat.JPEG, 95, out)
+        }
+    }
+
+    fun stripMp4Metadata(input: File, output: File) {
+        val extractor = android.media.MediaExtractor()
+        extractor.setDataSource(input.absolutePath)
+
+        val muxer = android.media.MediaMuxer(output.absolutePath,
+            android.media.MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
+
+        val trackCount = extractor.trackCount
+        val indexMap = IntArray(trackCount)
+        for (i in 0 until trackCount) {
+            extractor.selectTrack(i)
+            val format = extractor.getTrackFormat(i)
+            indexMap[i] = muxer.addTrack(format)
+        }
+
+        muxer.start()
+        val buf = java.nio.ByteBuffer.allocate(1 shl 20)
+        val info = android.media.MediaCodec.BufferInfo()
+
+        for (i in 0 until trackCount) {
+            extractor.selectTrack(i)
+            while (true) {
+                info.offset = 0
+                info.size = extractor.readSampleData(buf, 0)
+                if (info.size < 0) break
+                info.presentationTimeUs = extractor.sampleTime
+                info.flags = extractor.sampleFlags
+                muxer.writeSampleData(indexMap[i], buf, info)
+                extractor.advance()
+            }
+            extractor.unselectTrack(i)
+        }
+        muxer.stop(); muxer.release(); extractor.release()
+    }
+
+
+    // Logging functions to check
+
+
     private fun logSecurityLevelsFromAttestation(leaf: X509Certificate) {
         val oid = "1.3.6.1.4.1.11129.2.1.17"
         val ext = leaf.getExtensionValue(oid)
@@ -473,4 +540,81 @@ object AttestationPoc {
 
         Log.i(TAG, "attestationSecurityLevel=${map(attLvlEnum)}, keymasterSecurityLevel=${map(kmLvlEnum)}")
     }
+
+    // Logging Functions
+
+    fun logVideoMetadata(tag: String, file: File) {
+        try {
+            val mmr = MediaMetadataRetriever()
+            mmr.setDataSource(file.absolutePath)
+            val keys = listOf(
+                MediaMetadataRetriever.METADATA_KEY_TITLE,
+                MediaMetadataRetriever.METADATA_KEY_ARTIST,
+                MediaMetadataRetriever.METADATA_KEY_ALBUM,
+                MediaMetadataRetriever.METADATA_KEY_DATE,
+                MediaMetadataRetriever.METADATA_KEY_LOCATION
+            )
+            val sb = StringBuilder("Video metadata [$tag] ${file.name}:\n")
+            for (k in keys) {
+                sb.append("$k = ${mmr.extractMetadata(k)}\n")
+            }
+            android.util.Log.i("MetaStrip", sb.toString())
+            mmr.release()
+        } catch (e: Exception) {
+            android.util.Log.w("MetaStrip", "Failed to read video metadata: ${e.message}")
+        }
+    }
+
+    fun logExifTagsHard(tag: String, file: File) {
+        try {
+            // 0) Preflight: prove we're looking at the same file
+            Log.i("MetaStrip", "EXIF [$tag] path=${file.absolutePath} exists=${file.exists()} len=${file.length()} canRead=${file.canRead()}")
+
+            // 1) Always reopen a fresh instance
+            val exif = androidx.exifinterface.media.ExifInterface(file.absolutePath)
+
+            // 2) Log line-by-line to avoid multi-line truncation
+            fun l(s: String) = Log.i("MetaStrip", s)
+
+            // 3) Parsed coords (this is the authoritative signal)
+            val latLong = FloatArray(2)
+            val hasLatLong = exif.getLatLong(latLong)
+            l("EXIF [$tag] hasLatLong=$hasLatLong")
+            if (hasLatLong) l("  LAT_LONG = ${latLong[0]}, ${latLong[1]}")
+
+            // 4) A few key attributes (only non-null)
+            fun dumpAttr(k: String) {
+                val v = exif.getAttribute(k)
+                if (v != null) l("  $k = $v")
+            }
+            dumpAttr(androidx.exifinterface.media.ExifInterface.TAG_GPS_DATESTAMP)
+            dumpAttr(androidx.exifinterface.media.ExifInterface.TAG_GPS_TIMESTAMP) // may be null (rational array)
+            dumpAttr(androidx.exifinterface.media.ExifInterface.TAG_GPS_LATITUDE)
+            dumpAttr(androidx.exifinterface.media.ExifInterface.TAG_GPS_LONGITUDE)
+            dumpAttr(androidx.exifinterface.media.ExifInterface.TAG_GPS_LATITUDE_REF)
+            dumpAttr(androidx.exifinterface.media.ExifInterface.TAG_GPS_LONGITUDE_REF)
+            dumpAttr(androidx.exifinterface.media.ExifInterface.TAG_SOFTWARE)
+
+            // 5) Final marker so you know the function actually ran to completion
+            l("EXIF [$tag] dump complete.")
+        } catch (e: Exception) {
+            Log.w("MetaStrip", "Failed to read EXIF [$tag]: ${e.message}")
+        }
+    }
+
+    fun logExifProof(tag: String, file: File) {
+        try {
+            Log.i("MetaStrip", "[$tag] path=${file.absolutePath} len=${file.length()} canRead=${file.canRead()}")
+            val exif = ExifInterface(file.absolutePath)
+            val latLong = FloatArray(2)
+            val ok = exif.getLatLong(latLong)
+            Log.i("MetaStrip", "[$tag] parsedLatLong=$ok" + if (ok) " lat=${latLong[0]} lon=${latLong[1]}" else "")
+            Log.i("MetaStrip", "[$tag] gpsDate=${exif.getAttribute(ExifInterface.TAG_GPS_DATESTAMP)} software=${exif.getAttribute(ExifInterface.TAG_SOFTWARE)}")
+            Log.i("MetaStrip", "[$tag] done")
+        } catch (e: Exception) {
+            Log.w("MetaStrip", "[$tag] exif read error: ${e.message}")
+        }
+    }
+
+
 }
