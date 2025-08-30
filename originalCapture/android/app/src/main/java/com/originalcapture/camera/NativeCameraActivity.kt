@@ -33,6 +33,10 @@ import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.google.android.gms.tasks.CancellationTokenSource
 
+import com.originalcapture.AttestationClient.sendAttestationToServer
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
+
 
 class NativeCameraActivity : ComponentActivity() {
 
@@ -284,22 +288,60 @@ class NativeCameraActivity : ComponentActivity() {
   }
 
   /** Save = run attestation + return to RN */
-  private fun onSave() {
-    val file = lastCapturedFile ?: run {
-      finishWithError("No file to save")
-      return
+    private fun onSave() {
+        val file = lastCapturedFile ?: run {
+            finishWithError("No file to save")
+            return
+        }
+        val res = AttestationPoc.run(this, file)
+
+        lifecycleScope.launch {
+            val baseUrl = "http://xxxxx:8000" // Change this to localHOST ya,  ifconfig | grep inet and ensure both laptop and device are on same network
+
+            val mediaPath = res.mediaPath ?: run {
+                Log.e("AttestationPoc", "mediaPath is null")
+                finish()
+                return@launch
+            }
+            val sidecarPath = res.sidecarPath ?: run {
+                Log.e("AttestationPoc", "sidecarPath is null")
+                finish()
+                return@launch
+            }
+
+            try {
+                val response = sendAttestationToServer(
+                    baseUrl = baseUrl,
+                    mediaPath = mediaPath,
+                    sidecarPath = sidecarPath
+                )
+
+                Log.d("AttestationPoc", "Response: ${response.code} ${response.body}")
+
+                // Build Intent *after* getting server response
+                val data = Intent().apply {
+                    putExtra("action", "save")
+                    putExtra("ok", res.ok)
+                    putExtra("mediaPath", res.mediaPath)
+                    putExtra("receiptPath", res.sidecarPath)
+                    putExtra("message", res.message)
+                    // Add server response fields
+                    putExtra("serverResponseBody", response.body)
+                }
+                setResult(RESULT_OK, data)
+            } catch (e: Exception) {
+                Log.e("AttestationPoc", "Failed to send", e)
+                val data = Intent().apply {
+                    putExtra("action", "save")
+                    putExtra("ok", false)
+                    putExtra("error", e.message ?: "unknown error")
+                }
+                setResult(RESULT_CANCELED, data)
+            }
+
+            finish()
+        }
     }
-    val res = AttestationPoc.run(this, file)
-    val data = Intent().apply {
-      putExtra("action", "save")
-      putExtra("ok", res.ok)
-      putExtra("mediaPath", res.mediaPath)
-      putExtra("receiptPath", res.sidecarPath)
-      putExtra("message", res.message)
-    }
-    setResult(RESULT_OK, data)
-    finish()
-  }
 
   /** Edit = skip attestation, just return the media path so RN can open editor */
   private fun onEdit() {
