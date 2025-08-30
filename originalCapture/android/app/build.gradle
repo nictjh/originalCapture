@@ -158,6 +158,9 @@ dependencies {
 
     implementation "androidx.constraintlayout:constraintlayout:2.2.0"
 
+    //GSON for C2PA
+    implementation("com.google.code.gson:gson:2.10.1")
+
     // Navigation
     def nav_version = "2.7.7"
     implementation "androidx.navigation:navigation-fragment-ktx:$nav_version"
