@@ -1,10 +1,12 @@
 # main.py
+import os
 from fastapi import FastAPI, File, UploadFile, Form, HTTPException
 import json, base64
 from utils_crypto import sha256_bytes, decode_b64, verify_signature_with_pubkey
 from utils_x509_attestation import load_cert_chain_from_b64_list, validate_chain_against_roots, extract_key_description_from_cert, enforce_policy
 from cryptography import x509
 from cryptography.hazmat.primitives import serialization
+from typing import List
 
 import yaml
 
@@ -13,12 +15,13 @@ config = yaml.safe_load(open("config.yaml"))
 
 TRUST_STORE_FILE = f"{config['trust_store_dir']}/root"
 
+
 @app.post("/verify")
 async def verify_endpoint(
     payload_canonical: str = Form(...),
     sig_b64: str = Form(...),
-    x5c_der_b64: str = Form(...),  # we accept JSON array string for simplicity
-    media: UploadFile = File(None)
+    x5c_der_b64: List[str] = Form(...), 
+    media: UploadFile = File(...)
 ):
     # parse inputs
     try:
@@ -30,8 +33,13 @@ async def verify_endpoint(
     sig_bytes = base64.b64decode(sig_b64)
 
     try:
-        x5c_list = json.loads(x5c_der_b64)
-        certs = load_cert_chain_from_b64_list(x5c_list)
+        for i, cert_b64 in enumerate(x5c_der_b64):
+            if not isinstance(cert_b64, str) or not cert_b64.strip():
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"x5c_der_b64[{i}] is not a valid base64 string"
+                )
+        certs = load_cert_chain_from_b64_list(x5c_der_b64)
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"invalid x5c_der_b64: {e}")
 
