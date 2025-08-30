@@ -1,0 +1,47 @@
+{
+  "asset_id": "misleading-vid-1434",
+  "created_at": "2025-08-29T09:12:33Z",
+  "media": {
+    "type": "video",
+    "width": 1920,
+    "height": 1080,
+    "fps": 30,
+    "duration_sec": 12.751183074493362
+  },
+  "provenance": {
+    "c2pa_present": false,
+    "signed": false,
+    "actions_count": 3
+  },
+  "ops": [
+    {
+      "t": "compose",
+      "p": {
+        "type": "face_swap",
+        "area_pct_avg": 32.67458606888292,
+        "time_pct": 31.66218645114799
+      }
+    },
+    {
+      "t": "adjust",
+      "p": {
+        "brightness": 29,
+        "contrast": -24,
+        "saturation": 12
+      }
+    },
+    {
+      "t": "privacy_blur",
+      "p": {
+        "method": "gaussian",
+        "area_pct_avg": 2.9677417732324303,
+        "time_pct": 27.740987964651307
+      }
+    }
+  ],
+  "export": {
+    "fmt": "mp4",
+    "codec": "h264",
+    "quality": 85
+  }
+}
