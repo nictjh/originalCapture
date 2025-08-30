@@ -55,12 +55,12 @@ export default function EditorScreen({ route, navigation }) {
     Alert.alert('Crop (placeholder)', 'Hook this up to your crop flow.');
   };
 
-  const onAnnotate = () => {
-    Alert.alert('Annotate (placeholder)', 'Hook this up to draw/markup flow.');
+  const onCompose = () => {
+    Alert.alert('Compose (placeholder)', 'Hook this up to draw/markup flow.');
   };
 
-  const onAdjust = () => {
-    Alert.alert('Adjust (placeholder)', 'Hook this to brightness/contrast, etc.');
+  const onRedact = () => {
+    Alert.alert('Redact (placeholder)', 'Hook this to brightness/contrast, etc.');
   };
 
   const onSave = () => {
@@ -130,8 +130,8 @@ export default function EditorScreen({ route, navigation }) {
       <View style={styles.toolbar}>
         <ToolButton label="Rotate" onPress={onRotate} />
         <ToolButton label="Crop" onPress={onCrop} />
-        <ToolButton label="Annotate" onPress={onAnnotate} />
-        <ToolButton label="Adjust" onPress={onAdjust} />
+        <ToolButton label="Compose" onPress={onCompose} />
+        <ToolButton label="Redact" onPress={onRedact} />
       </View>
 
       {/* Footer actions */}
