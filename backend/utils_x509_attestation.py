@@ -123,7 +123,7 @@ def enforce_policy(attestation_dict: dict, payload_obj: dict, config: dict) -> T
     # (a) hardware-backed
     if config.get("require_hardware_backed", True):
         level = attestation_dict.get("attestationSecurityLevel", 0)
-        # In Android: 0 = software, 1 = Trusted Environment, 2 = StrongBox (values may vary by implementation)
+        # In Android: 0 = software, 1 = Trusted Environment, 2 = StrongBox
         if level == 0:
             return False, "Not hardware backed (attestationSecurityLevel indicates software)"
     # (b) challenge / nonce
