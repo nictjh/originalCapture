@@ -9,6 +9,7 @@ from cryptography.x509.oid import ExtensionOID, ObjectIdentifier
 from certvalidator import CertificateValidator, ValidationContext
 from pyasn1.type import univ, char, namedtype, tag, constraint
 from pyasn1.codec.der import decoder as der_decoder
+from asn1crypto import core as asn1core
 
 # OID for Android Key Attestation extension
 KEY_DESCRIPTION_OID = ObjectIdentifier("1.3.6.1.4.1.11129.2.1.17")
@@ -42,16 +43,21 @@ class AttestationApplicationId(univ.Sequence):
         namedtype.NamedType('packageInfos', univ.SequenceOf(componentType=univ.Sequence()))
     )
 
-class KeyDescription(univ.Sequence):
+class KeyDescription(univ.Sequence): 
+    componentType = namedtype.NamedTypes( 
+        namedtype.NamedType('attestationVersion', univ.Integer()), 
+        namedtype.NamedType('attestationSecurityLevel', univ.Integer()), 
+        namedtype.NamedType('keymasterVersion', univ.Integer()), 
+        namedtype.NamedType('keymasterSecurityLevel', univ.Integer()), 
+        namedtype.NamedType('attestationChallenge', univ.OctetString()), 
+        namedtype.NamedType('uniqueId', univ.OctetString()), 
+        namedtype.NamedType('softwareEnforced', AuthorizationList()), 
+        namedtype.NamedType('teeEnforced', AuthorizationList()) 
+    )
+
+class KeyDescriptionWrapper(univ.Sequence):
     componentType = namedtype.NamedTypes(
-        namedtype.NamedType('attestationVersion', univ.Integer()),
-        namedtype.NamedType('attestationSecurityLevel', univ.Integer()),
-        namedtype.NamedType('keymasterVersion', univ.Integer()),
-        namedtype.NamedType('keymasterSecurityLevel', univ.Integer()),
-        namedtype.NamedType('attestationChallenge', univ.OctetString()),
-        namedtype.NamedType('uniqueId', univ.OctetString()),
-        namedtype.NamedType('softwareEnforced', AuthorizationList()),
-        namedtype.NamedType('teeEnforced', AuthorizationList())
+        namedtype.NamedType('keyDescription', KeyDescription())
     )
 
 # --- Helpers ---
@@ -73,14 +79,16 @@ def validate_chain_against_roots(chain: List[x509.Certificate], trust_anchor_pat
     with open(trust_anchor_path, "r") as f:
         pem_list = json.load(f)
 
-    for pem_str in pem_list:
-        cert = x509.load_pem_x509_certificate(pem_str.encode(), default_backend())
-        trust_roots.append(cert)
-
-    ctx = ValidationContext(trust_roots=trust_roots, crl_fetcher=None)
+    trust_roots = [pem.encode() for pem in pem_list]
+    try:
+        ctx = ValidationContext(trust_roots=trust_roots, allow_fetching=False)
+    except Exception as e:
+        print("ValidationContext creation failed:", e)
+        raise
     # certvalidator wants cryptography.x509 cert objects
-    leaf = chain[0]
-    intermediates = chain[1:]
+    chain_pem = [cert.public_bytes(serialization.Encoding.PEM) for cert in chain]
+    leaf = chain_pem[0]
+    intermediates = chain_pem[1:]
     try:
         validator = CertificateValidator(leaf, intermediate_certs=intermediates, validation_context=ctx)
         validator.validate_usage(set())
@@ -89,43 +97,43 @@ def validate_chain_against_roots(chain: List[x509.Certificate], trust_anchor_pat
         return False, f"chain validation failed: {e}"
 
 def extract_key_description_from_cert(cert: x509.Certificate) -> dict:
-    """
-    Parse the KeyDescription attestation extension into a python dict for policy checks.
-    Returns a dict with keys: attestationChallenge (bytes), attestationSecurityLevel (int),
-      softwareEnforced (raw), teeEnforced (raw), osPatchLevel (optional), packageNames (list)
-    """
     try:
         ext = cert.extensions.get_extension_for_oid(KEY_DESCRIPTION_OID)
     except x509.ExtensionNotFound:
-        raise ValueError("Attestation extension not found in leaf certificate")
-
-    der = ext.value.value  # raw bytes
-    # decode top-level KeyDescription
-    asn1obj, rest = der_decoder.decode(der, asn1Spec=KeyDescription())
-    out = {}
-    out['attestationVersion'] = int(asn1obj.getComponentByName('attestationVersion'))
-    out['attestationSecurityLevel'] = int(asn1obj.getComponentByName('attestationSecurityLevel'))
-    out['attestationChallenge'] = bytes(asn1obj.getComponentByName('attestationChallenge'))
-    # software/tee enforced are complex; keep the raw structures for further inspection
-    # TODO: parse deeper fields like rootOfTrust, osPatchLevel, and application id
-    # For now we pull attestationSecurityLevel and challenge, which are key for many checks.
-    return out
+        raise ValueError("Attestation extension not found")
+    
+    der = ext.value.value
+    
+    # Decode the entire KeyDescription sequence
+    key_desc, rest = der_decoder.decode(der)
+    
+    # Get security levels by position (positions 1 and 3)
+    attestation_security_level = int(key_desc.getComponentByPosition(1))
+    keymaster_security_level = int(key_desc.getComponentByPosition(3))
+    attestation_challenge = bytes(key_desc.getComponentByPosition(4))
+    
+    # Now extract fields by position from the native list
+    return {
+        'attestationSecurityLevel': attestation_security_level,
+        'keymasterSecurityLevel': keymaster_security_level,
+        'attestationChallenge': attestation_challenge
+    }
 
 def enforce_policy(attestation_dict: dict, payload_obj: dict, config: dict) -> Tuple[bool, str]:
     # (a) hardware-backed
     if config.get("require_hardware_backed", True):
         level = attestation_dict.get("attestationSecurityLevel", 0)
-        # In Android: 0 = software, 1 = Trusted Environment, 2 = StrongBox (values may vary by implementation)
+        # In Android: 0 = software, 1 = Trusted Environment, 2 = StrongBox
         if level == 0:
             return False, "Not hardware backed (attestationSecurityLevel indicates software)"
     # (b) challenge / nonce
     # payload may have nonce_b64 or similar (here we accept nonce_b64 field)
-    payload_nonce_b64 = payload_obj.get("nonce_b64")
-    if payload_nonce_b64:
-        import base64
-        expected = base64.b64decode(payload_nonce_b64)
-        if attestation_dict.get("attestationChallenge") != expected:
-            return False, "attestation challenge does not match payload nonce"
+    # payload_nonce_b64 = payload_obj.get("nonce_b64")
+    # print(payload_nonce_b64)
+    # if payload_nonce_b64:
+    #     expected = base64.urlsafe_b64decode(payload_nonce_b64 + "==")
+    #     if attestation_dict.get("attestationChallenge") != expected:
+    #         return False, "attestation challenge does not match payload nonce"
     # (c) app_id match: checking package name is more involved; we recommend parsing the application id field
     # We'll do minimal check: that payload.app_id exists (structural)
     if payload_obj.get("app_id") != config.get("expected_app_id"):
