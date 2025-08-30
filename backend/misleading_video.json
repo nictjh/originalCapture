@@ -1,0 +1,14 @@
+{
+    "asset_id": "vid-demo-1",
+    "created_at": "2025-08-29T09:12:33Z",
+    "media": { "type": "video", "width": 1920, "height": 1080, "fps": 30, "duration_sec": 12.0 },
+    "provenance": { "c2pa_present": false, "signed": false, "actions_count": 4 },
+    "ops": [
+      { "t": "compose", "p": { "type": "bg_replace", "area_pct_avg": 35.0, "time_pct": 40 } },
+      { "t": "overlay", "p": { "captions": true } },
+      { "t": "adjust", "p": { "brightness": 20, "contrast": 15, "saturation": 10 } },
+      { "t": "privacy_blur", "p": { "method": "gaussian", "area_pct_avg": 3.0, "time_pct": 60 } }
+    ],
+    "export": { "fmt": "mp4", "codec": "h264", "quality": 80 }
+  }
+  
