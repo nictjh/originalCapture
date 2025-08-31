@@ -1,3 +1,6 @@
+
+![photo_2025-08-31_16-05-39](https://github.com/user-attachments/assets/d3685294-a155-4ab7-9c0c-0ad3d225328c)
+
 # verisnap — Hardware-Attested Camera + Edit-Chain C2PA + AI Authenticity
 > **Submission:** This repository is submitted for **“7. Privacy Meets AI: Building a Safer Digital Future.”**  
 
