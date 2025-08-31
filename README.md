@@ -6,22 +6,32 @@
 
 **Mission:** Let anyone trust that a photo/video came from a real device/app and—if it was edited—exactly how it was edited.
 
-**How:** The capture app (APK) signs capture facts with hardware-backed keys (TEE concept). A mock server verifies those facts and consults an AI authenticity model. Only when the user edits does VeriSnap mint/extend a C2PA manifest that chains those edits. The server then fuses hardware verification + model signal into a final verdict.
+**How:** 
+The capture app (APK) uses hardware-backed keys (TEE / StrongBox) to sign capture facts the moment a photo or video is taken. These signed proofs are sent to the server, where they can be cryptographically verified against Google’s root of trust.
+
+When a user makes edits, the app automatically extends a C2PA manifest, chaining the edit history to the original capture. This ensures every transformation is transparently recorded rather than hidden.
+
+The server then combines three signals:
+1. **Hardware verification** (proves the media originated on a real device, not an emulator or spoof).
+2. **C2PA edit chain** (proves the full integrity of edits applied).
+3. **AI authenticity model** (analyzes both original signatures and the edit chain to detect manipulation risks).
+
+Finally, the server fuses these into a single authenticity verdict — delivering a clear, tamper-evident label of whether the media is genuine, lightly edited, or suspicious.
 
 ## Contents
 
 **`/originalcapture`** – Android app that simulates TikTok-style "Record / Take Photo".
 - Captures media and strips metadata (no EXIF/GPS/etc. on outputs).
-- Computes media hash and signs an attestation payload using a device key (mocked hardware key in the demo).
-- Can perform optional local edits (e.g., crop).
+- Computes media hash and signs an attestation payload using a device key (hardware-backed keys in TEE shown in demo).
+- Can perform optional local edits (e.g., rotate, crop).
 - If edits were performed, builds or extends a C2PA manifest that chains those edits.
 - Uploads to the mock server.
 
-**`/backend/main.py`** – Mock verification service simlating Tiktok backend
-- Verifies signature/attestation (proving the capture originated from the device key).
+**`/backend/main.py`** – Mock verification service simlating Tiktok backend.
+- Verifies attestation (proving the capture originated from the device key).
 - Calls the AI model and returns a consolidated verdict.
 
-**`/backed/...`** – AI authenticity model (REST).
+**`/backed/...`** – AI authenticity model.
 - Consumes media + (optionally) a C2PA edit chain + server verification signal.
 - Returns `{ verdict: Authentic | NonAuthentic, confidence }`.
 
@@ -54,7 +64,7 @@ Server verifies signature, C2PA chain present (edits), AI flags manipulation →
 ┌───────────┐    capture bundle     ┌─────────────┐        media (+ optional edits)
 │  APK      │  ───────────────────▶ │  Mock       │  ───────────────────────────▶  AI Model
 │ (Camera + │  { media, hash,       │  Server     │   (uses C2PA only if edits)   (REST)
-│  Edits UI)│    attestation, sig   │ Verify with   │
+│  Edits UI)│    attestation, sig,  │ Verify with   │
 └────┬──────┘       c2pa       }     │  C2PA (edits)        ▲
      │  final JSON (verdict)         └─────────────┬────────┘
      └─────────────────────────────────────────────┘
@@ -106,7 +116,7 @@ If the user opens the editor and applies changes (e.g., crop/rotate/annotate), t
 
 Only in this case will the app create/extend a C2PA chain.
 
-#### Upload (POST /ingest)
+#### Upload (POST /verify)
 `multipart/form-data`:
 - `file`: media (edited or original)
 - `attestation`: JSON (above)
@@ -232,3 +242,19 @@ const classification = {
 - ✅ **End-to-end flow** (Android app → backend → model) with clear APIs and reproducible demos.
 - ✅ **Two real workflows demonstrated** (no edits → Authentic; minor edits → Authentic).
 - ✅ **Policy path for heavy edits → Not Authentic** (documented & testable).
+
+With **verisnap**, you’re not just preventing metadata leaks — you’re setting a new bar for trust in the age of AI. By combining hardware attestation, edit transparency, and AI-driven authenticity scoring, **verisnap** ensures that content is verified at the pixel level without exposing who captured it. This dual focus on privacy and provenance directly tackles the rise of deepfakes and manipulative AI content, which often violate victims’ privacy. Instead of forcing users to reveal their identity, **verisnap** proves the integrity of the media itself. The result: a digital ecosystem where creators retain privacy, viewers gain confidence, and platforms can finally enforce one clear principle — trust the pixel, not the profile.
+
+
+---
+
+🚀 Future Enhancements
+- Unified Workflows – tighten up workflows and ensure frictionless.
+- Visual Trust Badges – Embed clear authenticity indicators directly on media (badges/labels) instead of only returning JSON results. For PoC purposes this helps users see the verdict instantly.
+- Smarter AI Verification – Continuously improve the authenticity model with richer features (content signals + provenance data), making it more resilient against adversarial edits and next-gen deepfakes.
+- Expanded Editing Capabilities – Add richer editing options to mirror current creative tools and anticipate future AI-powered editing (generative composition, inpainting, synthetic scenes) — while still chaining edits via C2PA to preserve transparency.
+
+---
+
+# Let's build a safer digital future together :>
+
